@@ -1,0 +1,160 @@
+local function createInstance(class, properties)
+    local instance = Instance.new(class)
+    for prop, value in pairs(properties) do
+        instance[prop] = value
+    end
+    return instance
+end
+
+local mainFrame = createInstance("Frame", {
+    Size = UDim2.new(0, 350, 0, 250),
+    Position = UDim2.new(0.5, -175, 0.5, -125),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+    BorderSizePixel = 0,
+    Parent = screenGui
+})
+
+local sectionFrame = createInstance("Frame", {
+    Size = UDim2.new(0, 100, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(40, 40, 40),
+    BorderSizePixel = 0,
+    Parent = mainFrame
+})
+
+local buttons = {
+    {"Main", 0},
+    {"Inject", 50}
+}
+
+for i, v in ipairs(buttons) do
+    createInstance("TextButton", {
+        Size = UDim2.new(1, 0, 0, 50),
+        Position = UDim2.new(0, 0, 0, v[2]),
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+        Text = v[1],
+        Parent = sectionFrame
+    }).MouseButton1Click:Connect(function() showSection(i == 1 and mainSection or injectSection) end)
+end
+
+local contentFrame = createInstance("Frame", {
+    Size = UDim2.new(1, -100, 1, 0),
+    Position = UDim2.new(0, 100, 0, 0),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+    BorderSizePixel = 0,
+    Parent = mainFrame
+})
+
+local function showSection(section)
+    for _, child in ipairs(contentFrame:GetChildren()) do
+        if child:IsA("Frame") then child.Visible = false end
+    end
+    section.Visible = true
+end
+
+local mainSection = createInstance("Frame", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+    Parent = contentFrame
+})
+
+local injectSection = createInstance("Frame", {
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+    Visible = false,
+    Parent = contentFrame
+})
+
+local function fling()
+    local player = game.Players.LocalPlayer
+    local humanoidRootPart = (player.Character or player.CharacterAdded:Wait()):WaitForChild("HumanoidRootPart")
+    while true do
+        humanoidRootPart.CFrame = humanoidRootPart.CFrame * CFrame.Angles(0, math.rad(5), 0)
+        for _, otherPlayer in ipairs(game.Players:GetPlayers()) do
+            if otherPlayer ~= player and otherPlayer.Character then
+                local otherHumanoidRootPart = otherPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if otherHumanoidRootPart and (humanoidRootPart.Position - otherHumanoidRootPart.Position).magnitude < 10 then
+                    otherHumanoidRootPart.Velocity = (otherHumanoidRootPart.Position - humanoidRootPart.Position).unit * 50
+                end
+            end
+        end
+        wait(0.1)
+    end
+end
+
+local noclipEnabled = false
+
+local function toggleNoclip()
+    local character = game.Players.LocalPlayer.Character or game.Players.LocalPlayer.CharacterAdded:Wait()
+    noclipEnabled = not noclipEnabled
+    for _, part in ipairs(character:GetChildren()) do
+        if part:IsA("BasePart") then part.CanCollide = not noclipEnabled end
+    end
+end
+
+local function createActionButton(name, position, action)
+    createInstance("TextButton", {
+        Size = UDim2.new(1, 0, 0, 50),
+        Position = UDim2.new(0, 0, 0, position),
+        BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+        Text = name,
+        Parent = mainSection
+    }).MouseButton1Click:Connect(action)
+end
+
+createActionButton("Fling", 0, fling)
+createActionButton("Noclip", 50, toggleNoclip)
+
+local textBox = createInstance("TextBox", {
+    Size = UDim2.new(0, 300, 0, 120),
+    Position = UDim2.new(0.5, -150, 0, 50),
+    BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+    BorderSizePixel = 0,
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Font = Enum.Font.Gotham,
+    PlaceholderText = "Введите ваш скрипт сюда...",
+    PlaceholderColor3 = Color3.fromRGB(200, 200, 200),
+    ClearTextOnFocus = false,
+    MultiLine = true,
+    TextWrapped = true,
+    TextSize = 14,
+    Parent = injectSection
+})
+
+local function createExecuteButton(name, position, action)
+    createInstance("TextButton", {
+        Size = UDim2.new(0, 135, 0, 30),
+        Position = UDim2.new(0.5, position, 1, -40),
+        BackgroundColor3 = Color3.fromRGB(30, 144, 255),
+        BorderSizePixel = 0,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        Text = name,
+        Font = Enum.Font.GothamBold,
+        TextScaled = true,
+        Parent = injectSection
+    }).MouseButton1Click:Connect(action)
+end
+
+local messageLabel = createInstance("TextLabel", {
+    Size = UDim2.new(0, 300, 0, 30),
+    Position = UDim2.new(0.5, -150, 1, -80),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+    BorderSizePixel = 0,
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    Font = Enum.Font.Gotham,
+    TextScaled = true,
+    Parent = injectSection
+})
+
+createExecuteButton("Execute", -150, function()
+    local scriptSource = textBox.Text
+    if scriptSource == "" then
+        messageLabel.Text = "Ошибка: Поле ввода пусто!"
+        return
+    end
+
+    local success, err = pcall(function() loadstring(scriptSource)() end)
+    messageLabel.Text = success and "Скрипт успешно инжектирован!" or "Ошибка при инжекте скрипта: " .. err
+    textBox.Text = ""
+end)
+
+createExecuteButton("Очистить", 15, function() textBox.Text = "" end)
